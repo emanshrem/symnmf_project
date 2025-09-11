@@ -36,7 +36,7 @@ def avg_w(M): #getting m for intializing H
     return t/c if c else 0.0 #avoid divison by zero
 
 def init_H(W,k): 
-    m = avg_W(W)
+    m = avg_w(W)
     upper = 2.0*np.sqrt(m/float(k)) if k>0 else 0.0
     return np.random.uniform(0.0, upper, size=(len(W), k)) #low=0.0, high=upper, shape=n × k, where n = len(W)
 
@@ -79,3 +79,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
