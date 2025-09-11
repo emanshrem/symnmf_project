@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+
+# C / build
+*.o
+*.so
+a.out
+bin/
+
+# Editors
+.vscode/
+.idea/
