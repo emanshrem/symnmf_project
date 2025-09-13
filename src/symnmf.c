@@ -19,7 +19,7 @@ static void handle_error(void) {
 }
 
 /*matrix helpers*/
-static Matrix create_matrix(int r, int c) {
+Matrix create_matrix(int r, int c) {
     Matrix M;
     M.rows = r;
     M.cols = c;
@@ -28,16 +28,16 @@ static Matrix create_matrix(int r, int c) {
     if (!M.data) handle_error();
     return M;
 }
-static void free_matrix(Matrix *M) {
+void free_matrix(Matrix *M) {
     if (M && M->data) {
         free(M->data);
         M->data = NULL; }
     M->rows = M->cols = 0;
 }
-static double mget(const Matrix *M, int i, int j) {
+double mget(const Matrix *M, int i, int j) {
     return M->data[(size_t)i * (size_t)M->cols + (size_t)j];
 }
-static void mset(Matrix *M, int i, int j, double v) {
+void mset(Matrix *M, int i, int j, double v) {
     M->data[(size_t)i * (size_t)M->cols + (size_t)j] = v;
 }
 void mult_matrix(const Matrix *A, const Matrix *B, Matrix *C) {
@@ -145,7 +145,7 @@ static Matrix load_points(const char *path) {
 }
 
 /*math*/
-static void similarity_matrix(const Matrix *X, Matrix *A) {
+void similarity_matrix(const Matrix *X, Matrix *A) {
     /* A_ij = exp(-||xi - xj||^2 / 2) for i!=j; A_ii=0; symmetric */
     int n = X->rows;
     int d = X->cols;
@@ -165,7 +165,7 @@ static void similarity_matrix(const Matrix *X, Matrix *A) {
 }
 
 /* D is diagonal: D_ii = sum_j A_ij */
-static void degree_matrix(const Matrix *A, Matrix *D) {
+void degree_matrix(const Matrix *A, Matrix *D) {
     int n = A->rows;
     for (int i = 0; i < n; ++i) {
         double s = 0.0;
@@ -176,7 +176,7 @@ static void degree_matrix(const Matrix *A, Matrix *D) {
     }
 }
 
-static void normalized_sim_matrix(const Matrix *A, const Matrix *D, Matrix *W) {
+void normalized_sim_matrix(const Matrix *A, const Matrix *D, Matrix *W) {
     /* W = D^{-1/2} A D^{-1/2} : W_ij = A_ij / (sqrt(d_i)*sqrt(d_j)) */
     int n = A->rows;
     double *degree_inv_sqrt = (double*)malloc((size_t)n * sizeof(double));
