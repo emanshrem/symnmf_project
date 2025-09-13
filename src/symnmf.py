@@ -4,6 +4,7 @@ import numpy as np
 
 np.random.seed(1234)
 ERR_MSG="An Error Has Occurred"
+#try
 EPS=1e-4
 MAX_ITER=300
 BETA=0.5
