@@ -47,34 +47,42 @@ def print_matrix(M):
         print(",".join(f"{float(v):.4f}" for v in r))
 
 def main():
+    """
+    goal ∈ {symnmf, sym, ddg, norm}
+      - symnmf: H0 is initialized here; call C's symnmf(H0, W, …) and print H
+      - sym:call C's sym(X) and print A
+      - ddg:call C's ddg(X)and print D
+      - norm:call C's norm(X)    and print W
+    """
     try:
-        import symnmf as cmod   # C extension
+        import symnmf as cmod  #C extension module
+        # Read args
+        k=int(sys.argv[1])           
+        goal=sys.argv[2].strip().lower()
+        file_name=sys.argv[3]
+        X=load_points(file_name)
 
-        k        = int(sys.argv[1])
-        goal     = sys.argv[2].strip().lower()
-        filename = sys.argv[3]
-        X = load_points(filename)
-
-        if goal == "sym":
-            A = cmod.sym(X)  #pass datapoints X
+        if goal=="sym":
+            A=cmod.sym(X)           
             print_matrix(A)
 
         elif goal == "ddg":
-            D = cmod.ddg(X)  #pass datapoints X
+            D=cmod.ddg(X)            
             print_matrix(D)
 
-        elif goal == "norm":
-            W = cmod.norm(X) #pass datapoints X
+        elif goal=="norm":
+            W=cmod.norm(X)           
             print_matrix(W)
 
-        elif goal == "symnmf":
-            W  = cmod.norm(X)  #W computed in C from X
-            H0 = init_H(W, k)  #init ONLY in Python
+        elif goal=="symnmf":
+            W  = cmod.norm(X)                         
+            H0 = init_H(W, k) #only H0 is calculated in python                        
             Hf = cmod.symnmf(H0.tolist(), W, EPS, MAX_ITER, BETA, DEN_EPS)
             print_matrix(Hf)
-
+            
         else:
             handle_error()
+
     except Exception:
         handle_error()
 
