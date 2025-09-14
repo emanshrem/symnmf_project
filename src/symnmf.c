@@ -283,19 +283,33 @@ static void print_matrix(const Matrix *M) {
 int main(int argc, char **argv) {
 
     if (argc != 3) {
-        handle_error(); 
+        handle_error();                    
     }
 
     const char *goal = argv[1];
     const char *file = argv[2];
 
-    Matrix X = load_points(file); /*n×d*/
+    /*Validate goal*/
+    if (!(strcmp(goal, "sym") == 0 ||
+          strcmp(goal, "ddg") == 0 ||
+          strcmp(goal, "norm") == 0)) {
+        handle_error();
+    }
 
+    /*Load and validate data*/
+    Matrix X = load_points(file);  /* n×d */
+    if (X.data == NULL || X.rows <= 0 || X.cols <= 0) {
+        if (X.data != NULL) free_matrix(&X);   //in case of allocating partial memory: free allocation
+        handle_error();
+    }
+
+    /* Implementation */
     if (strcmp(goal, "sym") == 0) {
         Matrix A = create_matrix(X.rows, X.rows);
         similarity_matrix(&X, &A);
         print_matrix(&A);
         free_matrix(&A);
+
     } else if (strcmp(goal, "ddg") == 0) {
         Matrix A = create_matrix(X.rows, X.rows);
         Matrix D = create_matrix(X.rows, X.rows);
@@ -304,7 +318,8 @@ int main(int argc, char **argv) {
         print_matrix(&D);
         free_matrix(&D);
         free_matrix(&A);
-    } else if (strcmp(goal, "norm") == 0) {
+
+    } else { /* norm */
         Matrix A = create_matrix(X.rows, X.rows);
         Matrix D = create_matrix(X.rows, X.rows);
         Matrix W = create_matrix(X.rows, X.rows);
@@ -312,15 +327,14 @@ int main(int argc, char **argv) {
         degree_matrix(&A, &D);
         normalized_sim_matrix(&A, &D, &W);
         print_matrix(&W);
-        free_matrix(&W); 
-        free_matrix(&D); 
+        free_matrix(&W);
+        free_matrix(&D);
         free_matrix(&A);
-    } else {
-        /* Undefined goal */
-        free_matrix(&X);
-        handle_error();
+
     }
 
     free_matrix(&X);
     return 0;
 }
+
+
