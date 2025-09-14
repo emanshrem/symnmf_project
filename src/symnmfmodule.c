@@ -44,11 +44,7 @@ static int pylist_to_matrix(PyObject *obj, Matrix *out) {
 
     /* Allocate the output Matrix (contiguous row-major n*d). */
     *out = create_matrix((int)n, (int)d);
-    if (!matrix_ok(out)) {
-        Py_DECREF(rows_fast);
-        handle_error();
-        return 0;
-    }
+    
 
     /* Iterate over rows. For each row, wrap it with PySequence_Fast so we can
        index quickly and validate its length equals d (rectangular check). */
