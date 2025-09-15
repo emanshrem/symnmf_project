@@ -1,5 +1,5 @@
 import math
-import sys #newly added
+import sys 
 
 def load_points():
     """
@@ -13,14 +13,14 @@ def load_points():
         list[list[float]]: A list of points, where each point is a list of floats.
     """
     points = []  
-    try:  #new added
-        for line in sys.stdin:  #new added
+    try:  
+        for line in sys.stdin:  
             arr = list(map(float, line.strip().split(",")))  
             points.append(arr)  
         return points  
-    except:  #new added
-        print("An Error Has Occurred")  #new added
-        sys.exit(1)  #new added
+    except:  
+        print("An Error Has Occurred")  
+        sys.exit(1)  
 
 def initialize_centroids(points, K):
     """
@@ -129,9 +129,9 @@ def printCentroids(Centroids):
         Centroids (list[list[float]]): Final list of centroids.
     """
     for C in Centroids:
-        print(*["%.4f" % x for x in C], sep=",")  #new added (added %.4f formatting here)
+        print(*["%.4f" % x for x in C], sep=",")  
 
-def k_means(K, iter=400):  #new added
+def k_means(K, iter=400):  
     """
     Main K-means clustering algorithm.
 
@@ -140,15 +140,15 @@ def k_means(K, iter=400):  #new added
         iter (int): Maximum number of iterations to perform.
     """
     epsilon = 0.001  # Convergence threshold
-    points = load_points()  #new added
+    points = load_points()  
 
-    if not (1 < K < len(points)) :  #new added
-        print("Incorrect number of clusters!")  #new added
-        sys.exit(1)  #new added
+    if not (1 < K < len(points)) :  
+        print("Incorrect number of clusters!")  
+        sys.exit(1)  
  
-    if not (1 < iter < 1000 ) :  #new added
-        print("Incorrect maximum iteration!")  #new added
-        sys.exit(1)  #new added
+    if not (1 < iter < 1000 ) :  
+        print("Incorrect maximum iteration!")  
+        sys.exit(1)  
 
     dim = len(points[0])  # Dimensionality of each point
     centroids = initialize_centroids(points, K)
@@ -163,32 +163,32 @@ def k_means(K, iter=400):  #new added
     printCentroids(centroids)
     return 0  
 
-if __name__ == "__main__":  # is this write
+if __name__ == "__main__":  
     if len(sys.argv) not in [2, 3]:
         print("Invalid number of arguments!")
         sys.exit(1)
 
-    arg = sys.argv[1]  # new line
+    arg = sys.argv[1]  
     try:
-        val = float(arg)  # new line
+        val = float(arg)  
         if val.is_integer():
-            K = int(val)  # new line
+            K = int(val)  
         else:
-            print("Incorrect number of clusters!")  # new line
+            print("Incorrect number of clusters!")  
             sys.exit(1) 
     except ValueError:
         print("Incorrect number of clusters!")
         sys.exit(1)
 
-    if len(sys.argv) == 3:  # new line
-        iter_arg = sys.argv[2]  # new line
+    if len(sys.argv) == 3: 
+        iter_arg = sys.argv[2]  
         try:
-            iter_val = float(iter_arg)  # new line
+            iter_val = float(iter_arg)  
             if iter_val.is_integer():
-                iter = int(iter_val)  # new line
+                iter = int(iter_val)  
             else:
-                print("Incorrect maximum iteration!")  # new line
-                sys.exit(1)  # new line
+                print("Incorrect maximum iteration!")  
+                sys.exit(1) 
         except ValueError:
             print("Incorrect maximum iteration!")
             sys.exit(1)
@@ -196,7 +196,6 @@ if __name__ == "__main__":  # is this write
         iter = 400  # default iter = 400
 
     k_means(K, iter)
-
 
  
         
