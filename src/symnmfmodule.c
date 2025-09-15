@@ -8,16 +8,13 @@ static void handle_error(void) {
 
 /* Convert a Python list-of-lists (NxD) of floats to Matrix (n x d). */
 static int pylist_to_matrix(PyObject *obj, Matrix *out) {
-    /* Acquire a fast wrapper for the outer sequence (list of rows). */
     PyObject *rows_fast = PySequence_Fast(obj, "expected a list of lists");
     if (!rows_fast) {
-        /* A specific exception (TypeError) is already set by PySequence_Fast.
-           handle_error() will only set a generic error if none is set. */
         handle_error();
         return 0;
     }
 
-    /* Number of rows(n),reject empty input. */
+    /* Number of rows, reject empty input. */
     Py_ssize_t n = PySequence_Fast_GET_SIZE(rows_fast);
     if (n <= 0) {
         Py_DECREF(rows_fast);
@@ -44,37 +41,21 @@ static int pylist_to_matrix(PyObject *obj, Matrix *out) {
 
     /* Allocate the output Matrix (contiguous row-major n*d). */
     *out = create_matrix((int)n, (int)d);
-    
 
-    /* Iterate over rows. For each row, wrap it with PySequence_Fast so we can
-       index quickly and validate its length equals d (rectangular check). */
-    for (Py_ssize_t i = 0; i < n; ++i) {
-        PyObject *row = PySequence_Fast_GET_ITEM(rows_fast, i);  /* borrowed */
-        row_fast = PySequence_Fast(row, "rows must be sequences");
-        if (!row_fast) {
-            Py_DECREF(rows_fast);
-            free_matrix(out);
-            handle_error();
-            return 0;
-        }
+    /* Iterate rows; validate rectangularity and copy values. */
+    {
+        Py_ssize_t i, j;
+        for (i = 0; i < n; ++i) {
+            PyObject *row = PySequence_Fast_GET_ITEM(rows_fast, i);  /* borrowed */
+            row_fast = PySequence_Fast(row, "rows must be sequences");
+            if (!row_fast) {
+                Py_DECREF(rows_fast);
+                free_matrix(out);
+                handle_error();
+                return 0;
+            }
 
-        /* Every row must have exactly d items. */
-        if (PySequence_Fast_GET_SIZE(row_fast) != d) {
-            Py_DECREF(row_fast);
-            Py_DECREF(rows_fast);
-            free_matrix(out);
-            handle_error();
-            return 0;
-        }
-
-        /* Convert each value in the row to double and store into Matrix. */
-        for (Py_ssize_t j = 0; j < d; ++j) {
-            PyObject *v = PySequence_Fast_GET_ITEM(row_fast, j);  
-
-            /* PyFloat_AsDouble accepts floats, ints, and objects with float.
-               On failure it sets an exception */
-            double x = PyFloat_AsDouble(v);
-            if (PyErr_Occurred()) {
+            if (PySequence_Fast_GET_SIZE(row_fast) != d) {
                 Py_DECREF(row_fast);
                 Py_DECREF(rows_fast);
                 free_matrix(out);
@@ -82,38 +63,55 @@ static int pylist_to_matrix(PyObject *obj, Matrix *out) {
                 return 0;
             }
 
-            /*store: data[i*d + j] inside mset(). */
-            mset(out, (int)i, (int)j, x);
-        }
+            for (j = 0; j < d; ++j) {
+                PyObject *v = PySequence_Fast_GET_ITEM(row_fast, j);
+                double x = PyFloat_AsDouble(v);  /* accepts ints/floats; sets error on failure */
+                if (PyErr_Occurred()) {
+                    Py_DECREF(row_fast);
+                    Py_DECREF(rows_fast);
+                    free_matrix(out);
+                    handle_error();
+                    return 0;
+                }
+                mset(out, (int)i, (int)j, x);
+            }
 
-        /* Release the per-row fast wrapper before moving to the next row. */
-        Py_DECREF(row_fast);
+            Py_DECREF(row_fast);
+        }
     }
 
-    /* Release the outer fast wrapper and report success. */
     Py_DECREF(rows_fast);
     return 1;
 }
 
 /* Convert Matrix to Python list-of-lists. */
 static PyObject* matrix_to_pylist(const Matrix *M) {
-    PyObject *outer = PyList_New(M->rows);
+    PyObject *outer = PyList_New((Py_ssize_t)M->rows);
     if (!outer) {
-        return NULL; } 
-    for (int i = 0; i < M->rows; ++i) {
-        PyObject *inner = PyList_New(M->cols);
-        if (!inner) {
-            Py_DECREF(outer);
-            return NULL; }
-        for (int j = 0; j < M->cols; ++j) {
-            PyObject *num = PyFloat_FromDouble(mget(M, i, j));
-            if (!num) { 
-                Py_DECREF(inner);
-                Py_DECREF(outer); return NULL; }
-            PyList_SET_ITEM(inner, j, num); 
-        }
-        PyList_SET_ITEM(outer, i, inner);  
+        return NULL;
     }
+
+    {
+        int i, j;
+        for (i = 0; i < M->rows; ++i) {
+            PyObject *inner = PyList_New((Py_ssize_t)M->cols);
+            if (!inner) {
+                Py_DECREF(outer);
+                return NULL;
+            }
+            for (j = 0; j < M->cols; ++j) {
+                PyObject *num = PyFloat_FromDouble(mget(M, i, j));
+                if (!num) {
+                    Py_DECREF(inner);
+                    Py_DECREF(outer);
+                    return NULL;
+                }
+                PyList_SET_ITEM(inner, j, num);  /* steals ref */
+            }
+            PyList_SET_ITEM(outer, i, inner);     /* steals ref */
+        }
+    }
+
     return outer;
 }
 
@@ -217,12 +215,12 @@ static PyMethodDef SymNMFMethods[] = {
 
 static struct PyModuleDef symnmfmodule = {
     PyModuleDef_HEAD_INIT,
-    "symnmf",      /*module name as seen by Python */
+    "symnmf_c",      /*module name as seen by Python */
     NULL,          /*doc string */
     -1,            /*per-interpreter state size */
     SymNMFMethods
 };
 
-PyMODINIT_FUNC PyInit_symnmf(void) {
+PyMODINIT_FUNC PyInit_symnmf_c(void) {
     return PyModule_Create(&symnmfmodule);
 }

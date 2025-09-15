@@ -8,8 +8,7 @@ typedef struct {
     double *data;
 } Matrix;
 
-/* Error handling */
-void handle_error(void);
+
 
 /* Matrix helpers */
 Matrix create_matrix(int r, int c);
@@ -20,8 +19,7 @@ void mult_matrix(const Matrix *A, const Matrix *B, Matrix *C);
 void transpose_matrix(const Matrix *A, Matrix *AT);
 double frobenius_diff_sq(const Matrix *A, const Matrix *B);
 
-/* File loading */
-Matrix load_points(const char *path);
+
 
 /* Math functions */
 void similarity_matrix(const Matrix *X, Matrix *A);

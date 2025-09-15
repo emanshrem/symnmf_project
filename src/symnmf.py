@@ -98,7 +98,7 @@ def num_rows(X):
 
 def main():
     try:
-        import symnmf as cmod  #C extension module
+        import symnmf_c as cmod  #C extension module
 
         #Expect exactly 3 args: k goal file
         if len(sys.argv) != 4:
