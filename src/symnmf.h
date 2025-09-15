@@ -1,6 +1,6 @@
 #ifndef SYMNMF_H
 #define SYMNMF_H
-#include <stddef.h>
+
 
 /* Matrix struct */
 typedef struct {
