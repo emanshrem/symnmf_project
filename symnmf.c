@@ -16,6 +16,7 @@ static void handle_error(void) {
 
 /* matrix helpers */
 Matrix create_matrix(int r, int c) {
+     /*Allocate an r×c zero-initialized matrix as one contiguous row-major block*/
     Matrix M;
     size_t n;
     M.rows = r;
@@ -27,6 +28,7 @@ Matrix create_matrix(int r, int c) {
 }
 
 void free_matrix(Matrix *M) {
+    /*Release the matrix's contiguous data*/
     if (M && M->data) {
         free(M->data);
         M->data = NULL;
@@ -35,14 +37,20 @@ void free_matrix(Matrix *M) {
 }
 
 double mget(const Matrix *M, int i, int j) {
+    /*Read element (i,j) from a row-major matrix*/
     return M->data[(size_t)i * (size_t)M->cols + (size_t)j];
 }
 
 void mset(Matrix *M, int i, int j, double v) {
+    /*Write value v into element (i,j) of a row-major matrix*/
     M->data[(size_t)i * (size_t)M->cols + (size_t)j] = v;
 }
 
 void mult_matrix(const Matrix *A, const Matrix *B, Matrix *C) {
+    /* * Compute C = A × B for row-major matrices.
+    * Preconditions:
+    *   - A is (r × m), B is (m × c), C is preallocated (r × c)
+    *   - If shapes don’t match, handle_error() aborts.*/
     int r = A->rows;
     int m = A->cols;
     int c = B->cols;
@@ -66,6 +74,10 @@ void mult_matrix(const Matrix *A, const Matrix *B, Matrix *C) {
 }
 
 void transpose_matrix(const Matrix *A, Matrix *AT) {
+    /* * Compute AT = A^T for row-major matrices.
+     * Preconditions:
+     *   - A is (r x c); AT is preallocated as (c x r).
+     *   - If shapes don’t match, handle_error() aborts.*/
     int r = A->rows;
     int c = A->cols;
     int i, j;
@@ -81,8 +93,9 @@ void transpose_matrix(const Matrix *A, Matrix *AT) {
     }
 }
 
-/* Squared Frobenius norm: ||A - B||_F^2 */
+
 double frobenius_diff_sq(const Matrix *A, const Matrix *B) {
+    /* Squared Frobenius norm: ||A - B||_F^2 */
     int r = A->rows, c = A->cols;
     int i, j;
     double s = 0.0, d;
@@ -96,70 +109,44 @@ double frobenius_diff_sq(const Matrix *A, const Matrix *B) {
     return s;
 }
 
-/* file loading: datapoints X
- * Accepts commas and/or spaces as separators
- */
-Matrix load_points(const char *path) {
-    FILE *fp = fopen(path, "r");
-    const char *delims = " ,\t\r\n";
-    char buffer[8192];
-    size_t vals_cap = 1024, vals_len = 0;
-    double *vals;
-    int rows = 0, cols = -1;
 
-    char *p, *tok;
-    int this_cols;
-    char *endptr;
-    double v;
+static double *read_vals_rows_cols(const char *path, int *rows, int *cols, size_t *vals_len_out) {
+    /*helper: read file -> flat values + rows/cols*/
+    FILE *fp; const char *delims = " ,\t\r\n"; char buffer[8192];
+    size_t vals_cap = 1024, vals_len = 0; double *vals, *tmp, v;
+    char *p, *tok, *endptr; int this_cols;
 
-    if (!fp) handle_error();
-
-    vals = (double*)malloc(vals_cap * sizeof(double));
-    if (!vals) handle_error();
+    fp = fopen(path, "r"); if (!fp) handle_error();
+    vals = (double*)malloc(vals_cap * sizeof(double)); if (!vals) handle_error();
+    *rows = 0; *cols = -1;
 
     while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        /* trim-left whitespace; skip empty lines */
-        p = buffer;
-        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') ++p;
-        if (!*p) continue;
-
-        /* count tokens in this row and push doubles */
-        this_cols = 0;
-        tok = strtok(buffer, delims);
+        p = buffer; while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') ++p; if (!*p) continue;
+        this_cols = 0; tok = strtok(buffer, delims);
         while (tok) {
-            if (vals_len == vals_cap) {
-                double *tmp;
-                vals_cap *= 2u;
-                tmp = (double*)realloc(vals, vals_cap * sizeof(double));
-                if (!tmp) { free(vals); handle_error(); }
-                vals = tmp;
-            }
-            endptr = NULL;
-            v = strtod(tok, &endptr);
-            if (endptr == tok) { free(vals); handle_error(); } /* not a number */
-            vals[vals_len++] = v;
-            ++this_cols;
-            tok = strtok(NULL, delims);
+            if (vals_len == vals_cap) { vals_cap *= 2u; tmp = (double*)realloc(vals, vals_cap * sizeof(double)); if (!tmp) { free(vals); handle_error(); } vals = tmp; }
+            endptr = NULL; v = strtod(tok, &endptr); if (endptr == tok) { free(vals); handle_error(); }
+            vals[vals_len++] = v; ++this_cols; tok = strtok(NULL, delims);
         }
-
         if (this_cols == 0) continue;
-        if (cols == -1) cols = this_cols;
-        else if (this_cols != cols) { free(vals); handle_error(); } /* jagged */
-        ++rows;
+        if (*cols == -1) *cols = this_cols; else if (this_cols != *cols) { free(vals); handle_error(); }
+        ++(*rows);
     }
 
     fclose(fp);
-
-    if (rows <= 0 || cols <= 0) { free(vals); handle_error(); }
-    if ((size_t)rows * (size_t)cols != vals_len) { free(vals); handle_error(); }
-
-    {
-        Matrix X = create_matrix(rows, cols);
-        memcpy(X.data, vals, vals_len * sizeof(double));
-        free(vals);
-        return X;
-    }
+    if (*rows <= 0 || *cols <= 0) { free(vals); handle_error(); }
+    if ((size_t)(*rows) * (size_t)(*cols) != vals_len) { free(vals); handle_error(); }
+    *vals_len_out = vals_len; return vals;
 }
+
+Matrix load_points(const char *path) {
+    /*public: build Matrix from file contents*/
+    int rows, cols; size_t vals_len; double *vals; Matrix X;
+    vals = read_vals_rows_cols(path, &rows, &cols, &vals_len);
+    X = create_matrix(rows, cols); memcpy(X.data, vals, vals_len * sizeof(double));
+    free(vals); return X;
+}
+
 
 /* math */
 void similarity_matrix(const Matrix *X, Matrix *A) {
@@ -184,7 +171,6 @@ void similarity_matrix(const Matrix *X, Matrix *A) {
     }
 }
 
-/* D is diagonal: D_ii = sum_j A_ij */
 void degree_matrix(const Matrix *A, Matrix *D) {
     int n = A->rows;
     int i, j;
@@ -225,12 +211,13 @@ void normalized_sim_matrix(const Matrix *A, const Matrix *D, Matrix *W) {
     free(degree_inv_sqrt);
 }
 
-/* H_next_ij = H_ij * ((1-β) + β * ((W H)_ij / (H (H^T H))_ij + den_eps))
- * We compute H(H^T H) (same math as (H H^T)H, but faster when k << n).
- */
+
 void symnmf_update_once(const Matrix *W, const Matrix *H, Matrix *Hnext,
                         double beta, double den_eps)
 {
+    /* H_next_ij = H_ij * ((1-β) + β * ((W H)_ij / (H (H^T H))_ij + den_eps))
+    * We compute H(H^T H) (same math as (H H^T)H, but faster when k << n).
+    */
     int n = H->rows, k = H->cols;
     Matrix WH    = create_matrix(n, k);
     Matrix HT    = create_matrix(k, n);
@@ -303,8 +290,9 @@ void symnmf_optimize(const Matrix *W, Matrix *H,
     free_matrix(&Hnext);
 }
 
-/* print matrices */
+
 static void print_matrix(const Matrix *M) {
+    /* print matrices */
     int i, j;
     for (i = 0; i < M->rows; ++i) {
         for (j = 0; j < M->cols; ++j) {
@@ -315,65 +303,68 @@ static void print_matrix(const Matrix *M) {
     }
 }
 
-/* main */
-int main(int argc, char **argv) {
 
-    if (argc != 3) {
-        handle_error();
+/*goal runners*/
+static void run_sym_from_X(Matrix *Xp) {
+    Matrix X = *Xp;
+    {
+        Matrix A = create_matrix(X.rows, X.rows);
+        similarity_matrix(&X, &A); print_matrix(&A); free_matrix(&A);
     }
+}
+
+static void run_ddg_from_X(Matrix *Xp) {
+    Matrix X = *Xp;
+    {
+        Matrix A = create_matrix(X.rows, X.rows);
+        Matrix D = create_matrix(X.rows, X.rows);
+        similarity_matrix(&X, &A); degree_matrix(&A, &D);
+        print_matrix(&D); free_matrix(&D); free_matrix(&A);
+    }
+}
+
+static void run_norm_from_X(Matrix *Xp) {
+    Matrix X = *Xp;
+    {
+        Matrix A = create_matrix(X.rows, X.rows);
+        Matrix D = create_matrix(X.rows, X.rows);
+        Matrix W = create_matrix(X.rows, X.rows);
+        similarity_matrix(&X, &A); degree_matrix(&A, &D);
+        normalized_sim_matrix(&A, &D, &W);
+        print_matrix(&W); free_matrix(&W); free_matrix(&D); free_matrix(&A);
+    }
+}
+
+/* main (only delegates to the runners) */
+int main(int argc, char **argv) {
+    if (argc != 3) handle_error();
 
     {
-        const char *goal = argv[1];
-        const char *file = argv[2];
+        const char *goal = argv[1], *file = argv[2];
         Matrix X;
+        int g_sym, g_ddg, g_norm;
 
-        /* Validate goal */
-        if (!(strcmp(goal, "sym") == 0 ||
-              strcmp(goal, "ddg") == 0 ||
-              strcmp(goal, "norm") == 0)) {
-            handle_error();
-        }
+        g_sym  = (strcmp(goal, "sym")  == 0);
+        g_ddg  = (strcmp(goal, "ddg")  == 0);
+        g_norm = (strcmp(goal, "norm") == 0);
+        if (!(g_sym || g_ddg || g_norm)) handle_error();
 
-        /* Load and validate data */
-        X = load_points(file);  /* n×d */
+        X = load_points(file);
         if (X.data == NULL || X.rows <= 0 || X.cols <= 0) {
-            if (X.data != NULL) free_matrix(&X);
+            /*If the loaded matrix is invalid, free any allocated memory, then abort with the standard error*/
+            if (X.data) free_matrix(&X);
             handle_error();
         }
 
-        /* Implementation */
-        if (strcmp(goal, "sym") == 0) {
-            Matrix A = create_matrix(X.rows, X.rows);
-            similarity_matrix(&X, &A);
-            print_matrix(&A);
-            free_matrix(&A);
-
-        } else if (strcmp(goal, "ddg") == 0) {
-            Matrix A = create_matrix(X.rows, X.rows);
-            Matrix D = create_matrix(X.rows, X.rows);
-            similarity_matrix(&X, &A);
-            degree_matrix(&A, &D);
-            print_matrix(&D);
-            free_matrix(&D);
-            free_matrix(&A);
-
-        } else { /* norm */
-            Matrix A = create_matrix(X.rows, X.rows);
-            Matrix D = create_matrix(X.rows, X.rows);
-            Matrix W = create_matrix(X.rows, X.rows);
-            similarity_matrix(&X, &A);
-            degree_matrix(&A, &D);
-            normalized_sim_matrix(&A, &D, &W);
-            print_matrix(&W);
-            free_matrix(&W);
-            free_matrix(&D);
-            free_matrix(&A);
-        }
+        if (g_sym)      run_sym_from_X(&X);
+        else if (g_ddg) run_ddg_from_X(&X);
+        else            run_norm_from_X(&X);
 
         free_matrix(&X);
     }
     return 0;
 }
+
 
 
 
