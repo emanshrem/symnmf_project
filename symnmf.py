@@ -12,7 +12,6 @@ All matrices are printed with 4 decimal digits, one row per line, comma-separate
 """
 
 import sys
-from typing import List
 import numpy as np
 
 
@@ -30,12 +29,12 @@ np.random.seed(1234)
 # Error & IO utilities
 # ---------------------------------------------------------------------------
 
-def handle_error() -> None:
+def handle_error() :
     """Print the single required error line and exit with non-zero code."""
     print(ERR_MSG)
     sys.exit(1)
 
-def load_points(path: str) -> List[List[float]]:
+def load_points(path) :
     """Load N×d points from a text file.
 
     Each non-empty line is one point, with comma OR whitespace separators.
@@ -63,7 +62,7 @@ def load_points(path: str) -> List[List[float]]:
     except Exception:
         handle_error()
 
-def print_matrix(M) -> None:
+def print_matrix(M) :
     """Print a matrix (2D list or NumPy array) with 4 decimal places, comma-separated."""
 
     # Convert NumPy-like objects to nested Python lists when possible
@@ -84,7 +83,7 @@ def print_matrix(M) -> None:
 # Small math helpers
 # ---------------------------------------------------------------------------
 
-def _avg(mat: List[List[float]]) -> float:
+def _avg(mat) :
     """Average of all entries in a 2D list (used to scale H’s random init)."""
     total = 0.0
     count = 0
@@ -94,7 +93,7 @@ def _avg(mat: List[List[float]]) -> float:
             count += 1
     return (total / count) if count else 0.0 #avoid div by 0
 
-def init_H(W: List[List[float]], k: int) -> np.ndarray:
+def init_H(W, k) :
     """
     Random non-negative initialization for H (n×k).
     Upper bound follows the course’s guideline based on avg(W) and k.
@@ -109,7 +108,7 @@ def init_H(W: List[List[float]], k: int) -> np.ndarray:
 # CLI parsing & validation
 # ---------------------------------------------------------------------------
 
-def parse_int_like_k(raw) -> int | None:
+def parse_int_like_k(raw) :
     """
     Parse the command-line argument for k.
     Accepts:
@@ -146,7 +145,7 @@ def parse_int_like_k(raw) -> int | None:
             return None
         return int(s)
 
-def _validate_k_for_symnmf(k: int, n: int) -> None:
+def _validate_k_for_symnmf(k, n) :
     """
     Enforce 1 < k < n for the 'symnmf' goal (as required by the tester).
     On violation, triggers the standard error.
@@ -154,7 +153,7 @@ def _validate_k_for_symnmf(k: int, n: int) -> None:
     if not (1 < k < n):
         handle_error()
 
-def num_rows(X) -> int | None:
+def num_rows(X) :
     """Return number of rows in matrix-like object X, or None if not possible."""
     try:
         return len(X)
@@ -167,7 +166,7 @@ def num_rows(X) -> int | None:
 # Goal dispatch
 # ---------------------------------------------------------------------------
 
-def _parse_cli(argv: list[str]) -> tuple[int, str, str]:
+def _parse_cli(argv) :
     """
     Parse and validate CLI args.
 
@@ -190,7 +189,7 @@ def _parse_cli(argv: list[str]) -> tuple[int, str, str]:
 
     return k, goal, file_name
 
-def _run_goal(goal: str, X: list[list[float]], k: int) -> None:
+def _run_goal(goal, X, k) :
     """
     Compute and print the result for the requested goal using the C extension.
 
