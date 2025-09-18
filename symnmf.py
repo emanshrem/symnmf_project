@@ -26,8 +26,9 @@ DEN_EPS: float = 1e-6
 np.random.seed(1234)
 
 
-
-# ===== small helpers =====
+# ---------------------------------------------------------------------------
+# Error & IO utilities
+# ---------------------------------------------------------------------------
 
 def handle_error() -> None:
     """Print the single required error line and exit with non-zero code."""
@@ -62,6 +63,27 @@ def load_points(path: str) -> List[List[float]]:
     except Exception:
         handle_error()
 
+def print_matrix(M) -> None:
+    """Print a matrix (2D list or NumPy array) with 4 decimal places, comma-separated."""
+
+    # Convert NumPy-like objects to nested Python lists when possible
+    data = M.tolist() if hasattr(M,"tolist") else M
+
+    # Iterate row by row; each `row` should itself be an iterable of values.
+    for r in data:
+        # For each value `v` in the row:
+        #   - convert to float (ensures numeric formatting works)
+        #   - format with 4 decimal places via :.4f
+        # Join the formatted strings with commas and print the resulting line.
+
+        print(",".join(f"{float(v):.4f}" for v in r))
+
+
+
+# ---------------------------------------------------------------------------
+# Small math helpers
+# ---------------------------------------------------------------------------
+
 def _avg(mat: List[List[float]]) -> float:
     """Average of all entries in a 2D list (used to scale H’s random init)."""
     total = 0.0
@@ -82,24 +104,20 @@ def init_H(W: List[List[float]], k: int) -> np.ndarray:
     return np.random.uniform(0.0, upper, size=(len(W), k)) #low=0.0, high=upper, shape=n × k, where n = len(W)
 
 
-#continue from here 
-def print_matrix(M):
-    data = M.tolist() if hasattr(M,"tolist") else M
-    for r in data:
-        print(",".join(f"{float(v):.4f}" for v in r))
 
-def parse_int_like_k(raw):
+# ---------------------------------------------------------------------------
+# CLI parsing & validation
+# ---------------------------------------------------------------------------
+
+def parse_int_like_k(raw) -> int | None:
     """
     Parse the command-line argument for k.
     Accepts:
         - A non-negative decimal integer (leading zeros allowed).
         - The same, optionally preceded by a plus sign.
-        - A floating-point literal whose fractional part consists only of zeros
-        (i.e., an integral floating-point representation), with an optional leading plus.
+        - A floating-point literal whose fractional part consists only of zeros (i.e., an integral floating-point representation), with an optional leading plus.
     Rejects:
-        - Any negative value.
-        - Any fractional part containing nonzero digits.
-        - Empty or non-numeric input.
+        - Any negative value, Any fractional part containing nonzero digits, Empty or non-numeric input.
     Returns:
         The integer value of k if valid; otherwise None.
     """
@@ -124,11 +142,19 @@ def parse_int_like_k(raw):
             return None
         return int(whole)
     else:
-        if not s.isdigit():
+        if not s.isdigit(): #isdigit() Return True if the string is a digit string(contains at least one digit), False otherwise.
             return None
         return int(s)
 
-def num_rows(X):
+def _validate_k_for_symnmf(k: int, n: int) -> None:
+    """
+    Enforce 1 < k < n for the 'symnmf' goal (as required by the tester).
+    On violation, triggers the standard error.
+    """
+    if not (1 < k < n):
+        handle_error()
+
+def num_rows(X) -> int | None:
     """Return number of rows in matrix-like object X, or None if not possible."""
     try:
         return len(X)
@@ -136,64 +162,87 @@ def num_rows(X):
         return None
 
 
+
+# ---------------------------------------------------------------------------
+# Goal dispatch
+# ---------------------------------------------------------------------------
+
+def _parse_cli(argv: list[str]) -> tuple[int, str, str]:
+    """
+    Parse and validate CLI args.
+
+    Expected form: symnmf.py k goal file_name
+    - goal in {'sym', 'ddg', 'norm', 'symnmf'}
+    - k validated with parse_int_like_k
+    """
+    if len(argv) != 4:
+        handle_error()
+
+    k_raw, goal_raw, file_name = argv[1], argv[2], argv[3]
+
+    goal = goal_raw.strip().lower()
+    if goal not in ("sym", "ddg", "norm", "symnmf"):
+        handle_error()
+
+    k = parse_int_like_k(k_raw)
+    if k is None:
+        handle_error()
+
+    return k, goal, file_name
+
+def _run_goal(goal: str, X: list[list[float]], k: int) -> None:
+    """
+    Compute and print the result for the requested goal using the C extension.
+
+    For 'symnmf' we also validate k and initialize H in Python before
+    handing optimization to the C extension.
+    """
+    import symnmf_c as cmod  # local import keeps module scope clean
+
+    if goal == "sym":
+        S = cmod.sym(X)
+        print_matrix(S)
+        return
+
+    if goal == "ddg":
+        D = cmod.ddg(X)
+        print_matrix(D)
+        return
+
+    if goal == "norm":
+        W = cmod.norm(X)
+        print_matrix(W)
+        return
+
+    if goal == "symnmf":
+        n = len(X)
+        _validate_k_for_symnmf(k, n)
+        W = cmod.norm(X)
+        H0 = init_H(W, k)  # H0 (n x k) initialized in Python
+        Hf = cmod.symnmf(H0.tolist(), W, EPS, MAX_ITER, BETA, DEN_EPS)
+        print_matrix(Hf)
+        return
+
+    # Should be unreachable due to _parse_cli
+    handle_error()
+
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
 def main():
     try:
-        import symnmf_c as cmod  #C extension module
-
-        #Expect exactly 3 args: k goal file
-        if len(sys.argv) != 4:
-            handle_error()
-
-        org_k=sys.argv[1]
-        goal=sys.argv[2].strip().lower()
-        file_name=sys.argv[3]
-
-        #Validate goal
-        if goal not in ("sym", "ddg", "norm", "symnmf"):
-            handle_error()
-
-        #Validate and parse k if it's in one of the allowed shapes but isn't int in python 
-        k=parse_int_like_k(org_k) #returns None if k is invalid
-        if k is None:
-            handle_error()
+        #Parse CLI
+        k, goal, file_name = _parse_cli(sys.argv)
 
         #Load data
         X=load_points(file_name)
-        if X is None:
+        if num_rows(X) is None:
             handle_error()
 
-        n=num_rows(X)
-        if n is None:
-            handle_error()
-
-        #Require 1 < k < n for ALL goals, some goals don't need k but we think it's better to be consistent to not confuse the user
-        #if not (1 < k < n):
-           # handle_error()
-
-        #Implementation
-        if goal=="sym":
-            A=cmod.sym(X)
-            print_matrix(A)
-
-        elif goal=="ddg":
-            D=cmod.ddg(X)
-            print_matrix(D)
-
-        elif goal=="norm":
-            W=cmod.norm(X)
-            print_matrix(W)
-
-        elif goal=="symnmf":
-            n = len(X)   # or len(points) if that's your variable name
-            if not (1 < k < n):
-                handle_error()  # prints "An Error Has Occurred" and exits
-            W=cmod.norm(X)
-            H0=init_H(W, k)  #Only H0 is calculated in Python
-            Hf=cmod.symnmf(H0.tolist(), W, EPS, MAX_ITER, BETA, DEN_EPS)
-            print_matrix(Hf)
-
-        else: 
-            handle_error()
+        _run_goal(goal, X, k)
 
     except Exception:
         handle_error()
@@ -202,5 +251,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-#only main is > 40 lines, check others after documentation
