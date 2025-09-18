@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 import numpy as np
 from sklearn.metrics import silhouette_score
